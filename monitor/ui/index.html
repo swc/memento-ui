@@ -1,0 +1,1755 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Loom Project Team</title>
+    <style>
+      :root {
+        --keyboard-offset: 0px;
+        --nav-height: 52px;
+      }
+      :root {
+        --bg: #160a2a;
+        --panel: #f7f5f0;
+        --ink: #1b1b1b;
+        --muted: #6b6b6b;
+        --accent: #d56b1e;
+        --border: #e2ded4;
+        --header-ink: #ffffff;
+        --nav: rgba(10, 6, 20, 0.92);
+      }
+      * { box-sizing: border-box; }
+      html {
+        min-height: 100%;
+        background: #000;
+        overscroll-behavior-y: contain;
+      }
+      body {
+        min-height: 100%;
+        margin: 0;
+        color: var(--ink);
+        font-family: "IBM Plex Sans", "Helvetica Neue", "Arial", sans-serif;
+        touch-action: manipulation;
+        background-image: radial-gradient(circle at 10% 10%, #2b0f5b, #1a0b3c 45%, #120626 100%);
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+        background-size: cover;
+      }
+      .app {
+        background: transparent;
+      }
+      .app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 8px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 6px 0;
+        letter-spacing: 0.2px;
+        color: var(--header-ink);
+      }
+      .sub {
+        color: var(--header-ink);
+        font-size: 15px;
+        opacity: 0.85;
+      }
+      main {
+        flex: 1;
+        padding: 12px 16px 90px;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 14px 16px;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+        cursor: pointer;
+      }
+      .card-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card-extra {
+        display: none;
+        width: 100%;
+      }
+      .status-card.expanded .card-extra {
+        display: block;
+      }
+      .card-head {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .avatar {
+        width: 96px;
+        height: 96px;
+        border-radius: 12px;
+        object-fit: cover;
+        border: 1px solid #e6dccf;
+        background: #efe7dc;
+        cursor: pointer;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #efe7dc;
+        color: #3a2a19;
+        border: 1px solid #e0d2c2;
+        margin-top: 6px;
+        width: 96px;
+        justify-content: center;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #bfbfbf;
+      }
+      .status.online .status-dot {
+        background: #21b26f;
+      }
+      .status.away .status-dot {
+        background: #b5b5b5;
+      }
+      .avatar-fullscreen {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(92vw, 420px);
+        height: min(92vw, 420px);
+        border-radius: 24px;
+        z-index: 20;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 2, 16, 0.68);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+        z-index: 10;
+      }
+      .overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .title {
+        display: flex;
+        flex-direction: column;
+      }
+      .name {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      .role {
+        font-size: 18px;
+        color: #4a4a4a;
+        line-height: 1.1;
+        margin-top: 2px;
+      }
+      .stamp {
+        margin-top: 8px;
+      }
+      .agent {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .stamp {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .row {
+        margin-top: 8px;
+        font-size: 15px;
+        color: var(--ink);
+      }
+      .row.inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chat-btn {
+        border: none;
+        background: rgba(74, 124, 255, 0.18);
+        color: #2b1a10;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .nudge-btn {
+        border: none;
+        background: rgba(213, 107, 30, 0.16);
+        color: #7b3b07;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .label {
+        color: var(--muted);
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .value {
+        margin-top: 4px;
+        font-size: 15px;
+      }
+      .pill {
+        display: inline-block;
+        background: #f3e0d0;
+        color: #7b3b07;
+        border: 1px solid #edcdb4;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        margin-right: 6px;
+      }
+      .empty {
+        color: var(--muted);
+        font-style: italic;
+      }
+      footer {
+        padding: 8px 16px 24px;
+        color: var(--header-ink);
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: max(0px, calc(var(--keyboard-offset) - (var(--nav-height) * 0.5)));
+        background: var(--nav);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        justify-content: space-around;
+        padding: 6px 8px 10px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        z-index: 5;
+      }
+      nav button {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+      }
+      nav button .label {
+        font-size: 10px;
+        letter-spacing: 0.02em;
+      }
+      nav svg {
+        width: 20px;
+        height: 20px;
+        fill: currentColor;
+      }
+      nav button.active {
+        color: #7ed1ff;
+      }
+      nav .icon {
+        width: 22px;
+        height: 22px;
+        border-radius: 0;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .chat-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 1em;
+      }
+      .activity-list {
+        display: grid;
+        gap: 10px;
+      }
+      .activity-item {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        font-size: 13px;
+        color: var(--ink);
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .activity-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 1px solid #e6dccf;
+        background: #efe7dc;
+        flex: 0 0 auto;
+      }
+      .activity-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .activity-item .meta {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .chat-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--header-ink);
+        margin-bottom: 10px;
+      }
+      .chat-title-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .chat-title-row h2 {
+        margin: 0;
+        font-size: 26px;
+      }
+      .ghost-btn {
+        border: none;
+        border-radius: 999px;
+        padding: 6px 14px;
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .ghost-btn svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
+      }
+      .chat-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 14px 16px;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        position: relative;
+        padding-left: 52px;
+      }
+      .chat-card-checkbox {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        accent-color: #7ed1ff;
+        border-radius: 6px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .chat-list.edit-mode .chat-card-checkbox {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .chat-card h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .chat-card .role {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .chat-card p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .chat-meta {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 72px;
+        text-align: right;
+      }
+      .chat-thread {
+        background: transparent;
+        border-radius: 0;
+        padding: 170px 16px 90px;
+        min-height: calc(100vh - 210px);
+        max-height: calc(100vh - 210px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #chat-messages {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding-top: 220px;
+        padding-bottom: calc(120px + var(--keyboard-offset));
+        width: 100%;
+      }
+      .chat-floating {
+        position: fixed;
+        top: 40px;
+        left: 0;
+        right: 0;
+        z-index: 6;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+      }
+      .chat-floating.fullscreen {
+        z-index: 21;
+      }
+      .chat-floating img {
+        pointer-events: auto;
+        width: 96px;
+        height: 96px;
+        border-radius: 18px;
+        border: 2px solid #efe7dc;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.18);
+        background: #efe7dc;
+      }
+      .chat-floating img.avatar-fullscreen {
+        width: min(92vw, 420px);
+        height: min(92vw, 420px);
+        border-radius: 24px;
+      }
+      .chat-floating .chat-name {
+        margin-top: -12px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #2b1a10;
+        background: rgba(247, 245, 240, 0.92);
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 222, 212, 0.9);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .chat-floating .chat-name .chat-role {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b6b6b;
+      }
+      .fullscreen-chip {
+        position: fixed;
+        top: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 21;
+        font-size: 16px;
+        font-weight: 700;
+        color: #2b1a10;
+        background: rgba(247, 245, 240, 0.92);
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 222, 212, 0.9);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        pointer-events: none;
+      }
+      .chat-toggle {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        border: none;
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        background: rgba(247, 245, 240, 0.72);
+        color: #2b1a10;
+        cursor: pointer;
+        z-index: 7;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        backdrop-filter: blur(8px);
+        display: grid;
+        place-items: center;
+      }
+      .chat-toggle.active {
+        background: rgba(247, 245, 240, 0.86);
+      }
+      .chat-refresh {
+        position: fixed;
+        top: 20px;
+        right: 66px;
+        border: none;
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        background: rgba(255, 255, 255, 0.14);
+        color: #fff;
+        cursor: pointer;
+        font-size: 12px;
+        z-index: 7;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        backdrop-filter: blur(8px);
+        display: grid;
+        place-items: center;
+      }
+      .chat-refresh svg {
+        width: 18px;
+        height: 18px;
+      }
+      .chat-menu {
+        position: fixed;
+        top: 66px;
+        right: 14px;
+        background: rgba(18, 10, 32, 0.88);
+        border-radius: 14px;
+        padding: 8px;
+        z-index: 8;
+        box-shadow: 0 16px 32px rgba(0,0,0,0.25);
+        backdrop-filter: blur(10px);
+        display: none;
+        min-width: 170px;
+      }
+      .chat-menu.active {
+        display: block;
+      }
+      .chat-menu button {
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: #f5f1ea;
+        font-size: 13px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+      }
+      .chat-menu button:hover {
+        background: rgba(255,255,255,0.12);
+      }
+      .chat-menu button.menu-secondary {
+        font-size: 12px;
+        opacity: 0.75;
+      }
+      .chat-menu button.menu-danger {
+        font-size: 12px;
+        color: #ffb1b1;
+      }
+      .chat-bubble.observer {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .chat-bubble.observer .bubble-body {
+        flex: 1;
+      }
+      .chat-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: #efe7dc;
+      }
+      .chat-menu .checkbox {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.5);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+      }
+      .chat-menu .checkbox.checked {
+        background: rgba(255,255,255,0.9);
+        color: #1b1b1b;
+      }
+      .chat-back {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        border: none;
+        background: rgba(247, 245, 240, 0.72);
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        z-index: 7;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        backdrop-filter: blur(8px);
+        color: #2b1a10;
+      }
+      .chat-back svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .chat-edit,
+      .chat-delete-action {
+        border: none;
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        backdrop-filter: blur(8px);
+        color: #2b1a10;
+      }
+      .chat-edit {
+        background: rgba(247, 245, 240, 0.72);
+      }
+      .chat-edit svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .chat-delete-action {
+        background: rgba(255, 119, 119, 0.72);
+      }
+      .chat-delete-action svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .chat-bubble {
+        max-width: 78%;
+        margin-bottom: 12px;
+        padding: 10px 14px;
+        border-radius: 18px;
+        background: #e6e0f5;
+        color: #1b1b1b;
+        font-size: 14px;
+      }
+      .chat-bubble .sender {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(0,0,0,0.55);
+        margin-bottom: 4px;
+      }
+      .chat-loading {
+        text-align: center;
+        color: rgba(255,255,255,0.8);
+        font-size: 12px;
+        margin: 8px 0 14px;
+      }
+      .chat-bubble.self {
+        align-self: flex-end;
+        background: #4a7cff;
+        color: #fff;
+      }
+      .chat-bubble.typing {
+        align-self: flex-start;
+      }
+      .chat-bubble.typing {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(247, 245, 240, 0.78);
+        color: #2b1a10;
+      }
+      .typing-dots {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .typing-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: rgba(43, 26, 16, 0.7);
+        animation: typingBounce 1.2s infinite ease-in-out;
+      }
+      .typing-dot:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .typing-dot:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes typingBounce {
+        0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+        40% { transform: translateY(-4px); opacity: 1; }
+      }
+      .chat-input {
+        position: fixed;
+        bottom: calc(64px + var(--keyboard-offset) + env(safe-area-inset-bottom, 0px));
+        left: 0;
+        right: 0;
+        padding: 12px 16px 16px;
+        background: transparent;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .chat-input input {
+        flex: 1;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 222, 212, 0.8);
+        padding: 12px 16px;
+        font-size: 14px;
+        background: rgba(247, 245, 240, 0.88);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.16);
+        backdrop-filter: blur(8px);
+      }
+      .chat-input button {
+        border: none;
+        background: rgba(74, 124, 255, 0.62);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 999px;
+        cursor: pointer;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        backdrop-filter: blur(8px);
+        transition: opacity 0.2s ease;
+      }
+      .chat-input button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .chat-input button svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .fab {
+        position: fixed;
+        right: 18px;
+        bottom: calc(86px + var(--keyboard-offset));
+        background: rgba(74, 124, 255, 0.7);
+        color: #fff;
+        border: none;
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+        cursor: pointer;
+        z-index: 6;
+        backdrop-filter: blur(8px);
+      }
+      .contact-picker {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 6, 16, 0.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 7;
+      }
+      .contact-picker.active {
+        display: flex;
+      }
+      .contact-card {
+        background: var(--panel);
+        border-radius: 20px;
+        padding: 16px;
+        width: min(92vw, 360px);
+      }
+      .contact-card h3 {
+        margin: 0 0 14px;
+        font-size: 18px;
+      }
+      .contact-card button {
+        width: 100%;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.78);
+        padding: 8px 10px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        text-align: left;
+        cursor: pointer;
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .contact-card .avatar-mini {
+        width: 52px;
+        height: 52px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 1px solid #e6dccf;
+        background: #efe7dc;
+      }
+      .contact-card .contact-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .contact-card .contact-role {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      @media (min-width: 640px) {
+        header {
+          padding: 28px 24px 10px;
+        }
+        main {
+          padding: 12px 24px 28px;
+        }
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 900px) {
+        nav button {
+          font-size: 14px;
+        }
+        nav .icon {
+          width: 30px;
+          height: 30px;
+          font-size: 14px;
+        }
+        .fab {
+          bottom: 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <button id="tab-status" class="active" type="button" aria-label="Status">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 19h16v2H4v-2zm2-8h3v6H6v-6zm5-4h3v10h-3V7zm5-3h3v13h-3V4z"/>
+          </svg>
+        </span>
+        <span class="label">Status</span>
+      </button>
+      <button id="tab-chat" type="button" aria-label="Chat">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+          </svg>
+        </span>
+        <span class="label">Chat</span>
+      </button>
+      <button id="tab-activity" type="button" aria-label="Activity">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 13h4l2-8 4 14 2-6h6v2h-5l-3 8-4-14-2 8H3v-2z"/>
+          </svg>
+        </span>
+        <span class="label">Activity</span>
+      </button>
+      <button id="tab-settings" type="button" aria-label="Settings">
+        <span class="icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.14 12.94a7.96 7.96 0 0 0 .05-.94 7.96 7.96 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.27 7.27 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.12.55-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.68 7.84a.5.5 0 0 0 .12.64l2.03 1.58a7.96 7.96 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.04.7 1.62.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.58-.24 1.12-.55 1.62-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/>
+          </svg>
+        </span>
+        <span class="label">Settings</span>
+      </button>
+    </nav>
+    <div class="app">
+      <main>
+        <section id="view-status">
+          <div id="grid" class="grid"></div>
+        </section>
+        <section id="view-chat" class="hidden">
+          <div class="chat-title-row">
+            <h2>Chats</h2>
+            <div class="chat-title-actions">
+              <button
+                id="chat-edit"
+                class="chat-edit"
+                type="button"
+                aria-label="Enter chat edit mode"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+              </button>
+              <button
+                id="chat-delete-action"
+                class="chat-delete-action hidden"
+                type="button"
+                aria-label="Delete selected chats"
+                disabled
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 3h6v2h5v2H4V5h5V3zm-1 6h2v10H8V9zm4 0h2v10h-2V9zm4 0h2v10h-2V9z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="chat-list" class="chat-list"></div>
+        </section>
+        <section id="view-activity" class="hidden">
+          <div class="chat-title-row">
+            <h2>Activity</h2>
+          </div>
+          <div id="activity-list" class="activity-list"></div>
+        </section>
+        <section id="view-thread" class="hidden">
+          <button id="chat-back" class="chat-back" type="button" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15.5 5.5 9 12l6.5 6.5-1.4 1.4L6.2 12l7.9-7.9z"/>
+            </svg>
+          </button>
+          <button id="chat-toggle" class="chat-toggle" type="button" aria-label="Chat menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="5" cy="12" r="2"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="19" cy="12" r="2"></circle>
+            </svg>
+          </button>
+          <div id="chat-menu" class="chat-menu">
+            <button id="chat-observer" type="button">
+              <span>Observer mode</span>
+              <span id="chat-observer-check" class="checkbox">✓</span>
+            </button>
+            <button id="chat-refresh" type="button">Refresh context</button>
+            <button id="chat-prewarm" class="menu-secondary" type="button">Prewarm all chats</button>
+            <button id="chat-delete" class="menu-danger" type="button">Delete all messages</button>
+          </div>
+          <div id="chat-floating" class="chat-floating">
+            <img id="chat-avatar" class="avatar" alt="" />
+            <div id="chat-name" class="chat-name"></div>
+          </div>
+          <div class="chat-thread">
+            <div id="chat-loading" class="chat-loading hidden">Loading older messages…</div>
+            <div id="chat-messages"></div>
+          </div>
+          <div class="chat-input">
+            <input
+              id="chat-input"
+              type="text"
+              placeholder="Message"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              enterkeyhint="send"
+            />
+            <button id="chat-send" type="button" aria-label="Send message">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21.5 2.5 2.8 10.2c-.7.3-.6 1.4.1 1.6l6.7 2 2 6.7c.2.7 1.3.8 1.6.1L21.5 2.5zm-7.2 7.3-2.6 2.6.9 3.1 5.8-8.4-8.4 5.8 3.1.9 2.6-2.6z"/>
+              </svg>
+            </button>
+          </div>
+        </section>
+      </main>
+      <button id="chat-fab" class="fab hidden" type="button">+</button>
+      <div id="chat-picker" class="contact-picker">
+        <div class="contact-card">
+          <h3>Start chat</h3>
+          <div id="chat-contacts"></div>
+        </div>
+      </div>
+      <div id="overlay" class="overlay"></div>
+      <div id="fullscreen-chip" class="fullscreen-chip hidden"></div>
+      <footer id="foot"></footer>
+    </div>
+    <script>
+      document.addEventListener("gesturestart", event => event.preventDefault());
+      document.addEventListener("gesturechange", event => event.preventDefault());
+      document.addEventListener("gestureend", event => event.preventDefault());
+
+      const grid = document.getElementById("grid");
+      const foot = document.getElementById("foot");
+      const overlay = document.getElementById("overlay");
+      const fullscreenChip = document.getElementById("fullscreen-chip");
+      const tabStatus = document.getElementById("tab-status");
+      const tabChat = document.getElementById("tab-chat");
+      const tabActivity = document.getElementById("tab-activity");
+      const viewStatus = document.getElementById("view-status");
+      const viewChat = document.getElementById("view-chat");
+      const viewActivity = document.getElementById("view-activity");
+      const viewThread = document.getElementById("view-thread");
+      const chatList = document.getElementById("chat-list");
+      const chatFab = document.getElementById("chat-fab");
+      const chatPicker = document.getElementById("chat-picker");
+      const chatContacts = document.getElementById("chat-contacts");
+      const chatBack = document.getElementById("chat-back");
+      const chatRefresh = document.getElementById("chat-refresh");
+      const chatMenu = document.getElementById("chat-menu");
+      const chatObserver = document.getElementById("chat-observer");
+      const chatObserverCheck = document.getElementById("chat-observer-check");
+      const chatPrewarm = document.getElementById("chat-prewarm");
+      const chatDelete = document.getElementById("chat-delete");
+      const chatEdit = document.getElementById("chat-edit");
+      const chatDeleteAction = document.getElementById("chat-delete-action");
+      const chatMessages = document.getElementById("chat-messages");
+      const chatInput = document.getElementById("chat-input");
+      const chatSend = document.getElementById("chat-send");
+      const chatFloating = document.getElementById("chat-floating");
+      const chatAvatar = document.getElementById("chat-avatar");
+      const chatName = document.getElementById("chat-name");
+      const chatToggle = document.getElementById("chat-toggle");
+      const chatLoading = document.getElementById("chat-loading");
+      const activityList = document.getElementById("activity-list");
+      let fullscreenAvatar = null;
+      let fullscreenAgentId = null;
+      let cachedAgents = [];
+      let activeChannel = "";
+      const channelKey = (participants) =>
+        [...participants].sort().join("__");
+      let observerMode = false;
+      let activeMessages = [];
+      let chatBefore = 0;
+      let isChatLoading = false;
+      let typingTimeout = null;
+      let typingVisible = false;
+      const selfAgent = "product-owner";
+      let editMode = false;
+      const selectedChannels = new Set();
+      const chatCardRefs = new Map();
+      const pencilIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
+      const cancelIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18.3 5.71-1-1L12 9.99 6.72 4.7l-1 1L11 12l-5.28 5.29 1 1L12 14.01l5.29 5.28 1-1L13 12z"/></svg>`;
+
+      function resetSelections() {
+        selectedChannels.clear();
+        chatCardRefs.forEach(({ card, checkbox }) => {
+          checkbox.checked = false;
+          card.classList.remove("chat-card--selected");
+        });
+      }
+
+      function updateDeleteActionState() {
+        chatDeleteAction.disabled = selectedChannels.size === 0;
+        chatDeleteAction.classList.toggle("hidden", !editMode);
+      }
+
+      chatEdit.innerHTML = pencilIcon;
+      chatEdit.addEventListener("click", () => setEditMode(!editMode));
+      chatDeleteAction.addEventListener("click", confirmDeleteChats);
+      setEditMode(false);
+
+      function setEditMode(enabled) {
+        editMode = enabled;
+        chatList.classList.toggle("edit-mode", editMode);
+        chatEdit.innerHTML = editMode ? cancelIcon : pencilIcon;
+        if (!editMode) {
+          resetSelections();
+        }
+        updateDeleteActionState();
+      }
+
+      function updateKeyboardOffset() {
+        if (!window.visualViewport) return;
+        const vv = window.visualViewport;
+        if (!chatInput.matches(":focus")) {
+          document.documentElement.style.setProperty("--keyboard-offset", "0px");
+          return;
+        }
+        const rawOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        if (rawOffset < 80) {
+          document.documentElement.style.setProperty("--keyboard-offset", "0px");
+          return;
+        }
+        const offset = rawOffset;
+        document.documentElement.style.setProperty("--keyboard-offset", `${offset}px`);
+      }
+
+      function el(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text) n.textContent = text;
+        return n;
+      }
+
+      function formatTimestamp(ts) {
+        if (!ts) return "";
+        const date = new Date(ts);
+        if (Number.isNaN(date.getTime())) return ts;
+        return date.toLocaleString();
+      }
+
+      function renderAgent(agent) {
+        const card = el("div", "card");
+        const head = el("div", "card-head");
+        const title = el("div", "title");
+        const label = agent.personDisplayName || agent.agent;
+        const avatar = el("img", "avatar");
+        avatar.alt = label;
+        avatar.src = `/assets/agents/${agent.agent}.png`;
+        avatar.dataset.agent = agent.agent;
+        avatar.addEventListener("click", () => toggleFullscreen(avatar));
+        head.appendChild(avatar);
+        title.appendChild(el("div", "name", label));
+        const roleLabel = agent.roleDisplayName || agent.agent;
+        title.appendChild(el("div", "role", roleLabel));
+        const stampText = agent.activity?.ts ? formatTimestamp(agent.activity.ts) : "No activity";
+        const stamp = el("div", "stamp", stampText);
+        const status = el("div", "status");
+        const dot = el("span", "status-dot");
+        const statusText = el("span", "", "Away");
+        const ts = agent.activity?.ts ? Date.parse(agent.activity.ts) : NaN;
+        const isOnline =
+          agent.forceOnline ||
+          agent.chatActive ||
+          agent.agent === "product-owner" ||
+          (Number.isFinite(ts) && (Date.now() - ts) < 5 * 60 * 1000);
+        status.classList.add(isOnline ? "online" : "away");
+        statusText.textContent = isOnline ? "Online" : "Away";
+        status.appendChild(dot);
+        status.appendChild(statusText);
+        title.appendChild(stamp);
+        title.appendChild(status);
+        head.appendChild(title);
+        card.appendChild(head);
+
+        const msg = agent.currentActivity || "No recent activity";
+        const story = agent.activity?.story || "";
+        const tasks = agent.activity?.tasks || [];
+        const tags = agent.activity?.tags || [];
+
+        const row1 = el("div", "row");
+        row1.appendChild(el("div", "label", "Current Activity"));
+        row1.appendChild(el("div", "value", msg));
+        card.appendChild(row1);
+
+        const row1b = el("div", "row");
+        row1b.appendChild(el("div", "label", "Last Completed"));
+        const lastMsg = agent.lastCompletedActivity || "None";
+        row1b.appendChild(el("div", "value", lastMsg));
+        card.appendChild(row1b);
+
+        const row2 = el("div", "row");
+        row2.appendChild(el("div", "label", "Story / Tasks"));
+        const storyLine = el("div", "value");
+        if (story) storyLine.appendChild(el("span", "pill", story));
+        if (!story && tasks.length === 0) {
+          storyLine.appendChild(el("span", "empty", "No story/tasks"));
+        }
+        tasks.forEach(t => storyLine.appendChild(el("span", "pill", t)));
+        row2.appendChild(storyLine);
+        card.appendChild(row2);
+
+        const row3 = el("div", "row");
+        row3.appendChild(el("div", "label", "Tags"));
+        const tagsLine = el("div", "value");
+        if (tags.length === 0) {
+          tagsLine.appendChild(el("span", "empty", "No tags"));
+        } else {
+          tags.forEach(t => tagsLine.appendChild(el("span", "pill", t)));
+        }
+        row3.appendChild(tagsLine);
+        card.appendChild(row3);
+
+        const row4 = el("div", "row");
+        row4.appendChild(el("div", "label", "Last Seen"));
+        row4.appendChild(el("div", "value", agent.lastSeen ? formatTimestamp(agent.lastSeen) : "No activity"));
+        card.appendChild(row4);
+
+        const row5 = el("div", "row");
+        row5.appendChild(el("div", "label", "Last Response"));
+        row5.appendChild(
+          el("div", "value", agent.lastResponseAt ? formatTimestamp(agent.lastResponseAt) : "No response")
+        );
+        card.appendChild(row5);
+
+        const row6 = el("div", "row inline");
+        const chatBtn = el("button", "chat-btn", "Chat");
+        chatBtn.addEventListener("click", () => {
+          const channel = channelKey([selfAgent, agent.agent]);
+          openChat(channel, agent.personDisplayName || agent.agent);
+        });
+        const nudgeBtn = el("button", "nudge-btn", "Nudge");
+        nudgeBtn.addEventListener("click", async () => {
+          await fetch("/api/agents/nudge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agent: agent.agent })
+          });
+        });
+        row6.appendChild(chatBtn);
+        row6.appendChild(nudgeBtn);
+        card.appendChild(row6);
+
+        return card;
+      }
+
+      function toggleFullscreen(target) {
+        if (fullscreenAvatar && fullscreenAvatar !== target) {
+          fullscreenAvatar.classList.remove("avatar-fullscreen");
+        }
+        const isActive = target.classList.toggle("avatar-fullscreen");
+        fullscreenAvatar = isActive ? target : null;
+        fullscreenAgentId = isActive ? target.dataset.agent : null;
+        overlay.classList.toggle("active", isActive);
+        if (isActive) {
+          fullscreenChip.textContent = target.alt || target.dataset.agent || "";
+          fullscreenChip.classList.remove("hidden");
+        } else {
+          fullscreenChip.classList.add("hidden");
+        }
+        if (target.id === "chat-avatar") {
+          chatFloating.classList.toggle("fullscreen", isActive);
+        }
+      }
+
+      overlay.addEventListener("click", () => {
+        if (fullscreenAvatar) {
+          fullscreenAvatar.classList.remove("avatar-fullscreen");
+          fullscreenAvatar = null;
+          fullscreenAgentId = null;
+        }
+        overlay.classList.remove("active");
+        fullscreenChip.classList.add("hidden");
+      });
+
+      chatAvatar.addEventListener("click", () => toggleFullscreen(chatAvatar));
+
+      function setTab(tab) {
+        const isChat = tab === "chat";
+        const isActivity = tab === "activity";
+        tabStatus.classList.toggle("active", tab === "status");
+        tabChat.classList.toggle("active", isChat);
+        tabActivity.classList.toggle("active", isActivity);
+        viewStatus.classList.toggle("hidden", tab !== "status");
+        viewActivity.classList.toggle("hidden", !isActivity);
+        viewChat.classList.toggle("hidden", !isChat || !!activeChannel);
+        viewThread.classList.toggle("hidden", !activeChannel || !isChat);
+        chatFab.classList.toggle("hidden", !isChat || !!activeChannel);
+        foot.classList.toggle("hidden", isChat || isActivity);
+        chatFloating.classList.toggle("hidden", !activeChannel || !isChat);
+        if (!isChat && fullscreenAvatar) {
+          fullscreenAvatar.classList.remove("avatar-fullscreen");
+          fullscreenAvatar = null;
+          fullscreenAgentId = null;
+          overlay.classList.remove("active");
+          fullscreenChip.classList.add("hidden");
+        }
+        localStorage.setItem("monitorTab", tab);
+      }
+
+      function renderChatSummary(channels) {
+        chatList.innerHTML = "";
+        chatCardRefs.clear();
+        if (!channels.length) {
+          chatList.appendChild(el("div", "card", "No chats yet"));
+          return;
+        }
+        channels.forEach(channel => {
+          const card = el("div", "chat-card");
+          card.classList.add("chat-list-card");
+          const avatar = el("img", "avatar");
+          const agentId = channel.agent?.id || channel.channel;
+          const channelParts = channel.channel.includes("__") ? channel.channel.split("__") : [agentId];
+          const other = channelParts.find(p => p !== selfAgent) || agentId;
+          const agentMeta = cachedAgents.find(agent => agent.agent === other);
+          const display = agentMeta?.personDisplayName || other || channel.channel;
+          avatar.src = `/assets/agents/${other}.png`;
+          avatar.alt = display;
+          const checkbox = el("input", "chat-card-checkbox");
+          checkbox.type = "checkbox";
+          const isAlreadySelected = selectedChannels.has(channel.channel);
+          checkbox.checked = isAlreadySelected;
+          const textBody = el("div", "");
+          const time = channel.lastTs ? new Date(channel.lastTs).toLocaleTimeString() : "";
+          const last = channel.lastMessage || "No messages yet";
+          textBody.appendChild(el("h3", "", display));
+          const roleLabel = agentMeta?.roleDisplayName || "";
+          if (roleLabel) {
+            textBody.appendChild(el("div", "role", roleLabel));
+          }
+          textBody.appendChild(el("p", "", last));
+          card.appendChild(checkbox);
+          card.appendChild(avatar);
+          card.appendChild(textBody);
+          const metaTime = el("div", "chat-meta", time);
+          card.appendChild(metaTime);
+          const handleSelection = () => {
+            if (checkbox.checked) {
+              selectedChannels.add(channel.channel);
+              card.classList.add("chat-card--selected");
+            } else {
+              selectedChannels.delete(channel.channel);
+              card.classList.remove("chat-card--selected");
+            }
+            updateDeleteActionState();
+          };
+          checkbox.addEventListener("click", event => event.stopPropagation());
+          checkbox.addEventListener("change", handleSelection);
+          card.addEventListener("click", () => {
+            if (editMode) {
+              checkbox.checked = !checkbox.checked;
+              handleSelection();
+              return;
+            }
+            openChat(channel.channel, display);
+          });
+          if (isAlreadySelected) {
+            card.classList.add("chat-card--selected");
+          }
+          chatCardRefs.set(channel.channel, { card, checkbox });
+          chatList.appendChild(card);
+        });
+        Array.from(selectedChannels).forEach(channelId => {
+          if (!chatCardRefs.has(channelId)) {
+            selectedChannels.delete(channelId);
+          }
+        });
+        chatDeleteAction.disabled = selectedChannels.size === 0;
+        chatDeleteAction.classList.toggle("hidden", !editMode);
+      }
+
+      function scrollMessagesToBottom() {
+        requestAnimationFrame(() => {
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+      }
+
+      function renderChatMessages(messages, { prepend = false, scrollToBottom = true } = {}) {
+        activeMessages = messages;
+        if (!prepend) {
+          chatMessages.innerHTML = "";
+        }
+        const participants = activeChannel.includes("__") ? activeChannel.split("__") : [activeChannel];
+        messages.forEach(msg => {
+          if (!observerMode && !participants.includes(msg.agent)) {
+            return;
+          }
+          const bubble = el("div", "chat-bubble");
+          if (msg.agent === selfAgent) {
+            bubble.classList.add("self");
+          }
+          if (observerMode && msg.agent && msg.agent !== selfAgent) {
+            bubble.classList.add("observer");
+            const avatar = el("img", "chat-avatar");
+            avatar.src = `/assets/agents/${msg.agent}.png`;
+            avatar.alt = msg.agent;
+            bubble.appendChild(avatar);
+            const body = el("div", "bubble-body");
+            body.appendChild(el("span", "sender", msg.agent));
+            body.appendChild(document.createTextNode(msg.message));
+            bubble.appendChild(body);
+          } else {
+            if (observerMode && msg.agent) {
+              bubble.appendChild(el("span", "sender", msg.agent));
+            }
+            bubble.appendChild(document.createTextNode(msg.message));
+          }
+        if (prepend) {
+          chatMessages.insertBefore(bubble, chatMessages.firstChild);
+        } else {
+          chatMessages.appendChild(bubble);
+        }
+      });
+        if (!prepend && scrollToBottom) {
+          scrollMessagesToBottom();
+        }
+        updateTypingIndicator(activeMessages);
+      }
+
+      function updateTypingIndicator(messages) {
+        if (!activeChannel) return;
+        const existing = document.getElementById("typing-indicator");
+        if (existing) {
+          existing.remove();
+          typingVisible = false;
+        }
+        const last = messages[messages.length - 1];
+        const awaitingReply = last && last.agent === selfAgent;
+        if (!awaitingReply) {
+          return;
+        }
+        const bubble = el("div", "chat-bubble typing");
+        bubble.id = "typing-indicator";
+        const dots = el("div", "typing-dots");
+        dots.appendChild(el("span", "typing-dot"));
+        dots.appendChild(el("span", "typing-dot"));
+        dots.appendChild(el("span", "typing-dot"));
+        bubble.appendChild(dots);
+        chatMessages.appendChild(bubble);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        typingVisible = true;
+      }
+
+      function confirmDeleteChats() {
+        if (!selectedChannels.size) return;
+        if (!window.confirm(`Delete ${selectedChannels.size} selected chat(s)?`)) {
+          return;
+        }
+        const deletions = Array.from(selectedChannels).map(channel =>
+          fetch(`/api/chat/${encodeURIComponent(channel)}`, { method: "DELETE" })
+        );
+        Promise.all(deletions)
+          .then(() => {
+            setEditMode(false);
+            refreshChats();
+          })
+          .catch(() => {
+            alert("Failed to delete selected chats.");
+          });
+      }
+
+      async function refreshChats() {
+        try {
+          const res = await fetch("/api/chat/summary");
+          const data = await res.json();
+          renderChatSummary(data.channels || []);
+        } catch (err) {
+          chatList.textContent = "Failed to load chats.";
+        }
+      }
+
+      async function refreshActivity() {
+        try {
+          const res = await fetch("/api/activity?limit=50");
+          const data = await res.json();
+          activityList.innerHTML = "";
+          (data.entries || []).forEach(entry => {
+            const item = el("div", "activity-item");
+            const agentId = entry.agent || "system";
+            const metaInfo = cachedAgents.find(agent => agent.agent === agentId);
+            const avatar = el("img", "activity-avatar");
+            avatar.alt = metaInfo?.personDisplayName || agentId;
+            avatar.src = `/assets/agents/${agentId}.png`;
+            const body = el("div", "activity-body");
+            const meta = el(
+              "div",
+              "meta",
+              `${metaInfo?.personDisplayName || agentId} · ${formatTimestamp(entry.ts || "")}`
+            );
+            const msg = el("div", "", entry.message || "");
+            body.appendChild(meta);
+            body.appendChild(msg);
+            item.appendChild(avatar);
+            item.appendChild(body);
+            activityList.appendChild(item);
+          });
+          if (!(data.entries || []).length) {
+            activityList.appendChild(el("div", "activity-item", "No activity yet."));
+          }
+        } catch (err) {
+          activityList.textContent = "Failed to load activity.";
+        }
+      }
+
+      async function openChat(channel, displayName) {
+        activeChannel = channel;
+        const participants = channel.includes("__") ? channel.split("__") : [channel];
+        const other = participants.find(p => p !== selfAgent) || channel;
+        const meta = cachedAgents.find(agent => agent.agent === other);
+        const label = meta?.personDisplayName || displayName || other;
+        chatAvatar.src = `/assets/agents/${other}.png`;
+        chatAvatar.alt = label;
+        chatName.textContent = label;
+        if (!observerMode) {
+          chatToggle.classList.remove("active");
+        } else {
+          chatToggle.classList.add("active");
+        }
+        setTab("chat");
+        localStorage.setItem("monitorChannel", channel);
+        try {
+          chatBefore = 0;
+          const res = await fetch(`/api/chat/${encodeURIComponent(channel)}?limit=25`);
+          const data = await res.json();
+          chatBefore = data.nextBefore || 0;
+          renderChatMessages(data.messages || []);
+        } catch (err) {
+          chatMessages.textContent = "Failed to load messages.";
+        }
+        chatLoading.classList.add("hidden");
+        setTimeout(() => {
+          chatInput.focus();
+        }, 0);
+      }
+
+      function closeChat() {
+        activeChannel = "";
+        chatBefore = 0;
+        isChatLoading = false;
+        chatLoading.classList.add("hidden");
+        chatFloating.classList.add("hidden");
+        viewThread.classList.add("hidden");
+        viewChat.classList.remove("hidden");
+        chatFab.classList.remove("hidden");
+        chatMenu.classList.remove("active");
+        localStorage.removeItem("monitorChannel");
+      }
+
+      async function sendChatMessage(msg, clearInput = true) {
+        if (!msg || !activeChannel) return;
+        const optimistic = {
+          ts: new Date().toISOString(),
+          channel: activeChannel,
+          agent: selfAgent,
+          message: msg
+        };
+        activeMessages = [...activeMessages, optimistic];
+        renderChatMessages(activeMessages);
+        if (clearInput) chatInput.value = "";
+        typingVisible = false;
+        if (typingTimeout) clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          updateTypingIndicator(activeMessages);
+        }, 1200);
+        await fetch(`/api/chat/${encodeURIComponent(activeChannel)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent: selfAgent, message: msg })
+        });
+        await openChat(activeChannel, chatName.textContent);
+      }
+
+      async function sendChat() {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+        await sendChatMessage(msg);
+        updateSendEnabled();
+      }
+
+      async function refresh() {
+        try {
+          const res = await fetch("/api/status");
+          const data = await res.json();
+          cachedAgents = data.agents || [];
+          grid.innerHTML = "";
+          const sorted = [...data.agents].sort((a, b) => {
+            const aTs = a.activity?.ts ? Date.parse(a.activity.ts) : NaN;
+            const bTs = b.activity?.ts ? Date.parse(b.activity.ts) : NaN;
+            const aOnline = Number.isFinite(aTs) && (Date.now() - aTs) < 5 * 60 * 1000;
+            const bOnline = Number.isFinite(bTs) && (Date.now() - bTs) < 5 * 60 * 1000;
+            if (a.agent === "product-owner") return 1;
+            if (b.agent === "product-owner") return -1;
+            if (aOnline !== bOnline) return aOnline ? -1 : 1;
+            return (a.agent || "").localeCompare(b.agent || "");
+          });
+          sorted.forEach(agent => grid.appendChild(renderAgent(agent)));
+          if (fullscreenAgentId) {
+            const next = grid.querySelector(`img.avatar[data-agent="${fullscreenAgentId}"]`);
+            if (next) {
+              next.classList.add("avatar-fullscreen");
+              fullscreenAvatar = next;
+              overlay.classList.add("active");
+            } else {
+              fullscreenAvatar = null;
+              fullscreenAgentId = null;
+              overlay.classList.remove("active");
+            }
+          }
+          foot.textContent = `Last refresh: ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          foot.textContent = "Failed to load data";
+        }
+      }
+
+      tabStatus.addEventListener("click", () => {
+        if (activeChannel) {
+          closeChat();
+        }
+        setTab("status");
+      });
+      tabChat.addEventListener("click", () => {
+        setTab("chat");
+        refreshChats();
+      });
+      tabActivity.addEventListener("click", () => {
+        setTab("activity");
+        refreshActivity();
+      });
+      chatBack.addEventListener("click", closeChat);
+      chatSend.addEventListener("click", sendChat);
+      chatRefresh.addEventListener("click", () => sendChatMessage("refresh context", false));
+      chatPrewarm.addEventListener("click", async () => {
+        await fetch("/api/chat/prewarm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agents: [] })
+        });
+        chatMenu.classList.remove("active");
+      });
+      chatDelete.addEventListener("click", async () => {
+        if (!activeChannel) return;
+        await fetch(`/api/chat/${encodeURIComponent(activeChannel)}`, { method: "DELETE" });
+        chatMenu.classList.remove("active");
+        await openChat(activeChannel, chatName.textContent);
+      });
+      chatInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          sendChat();
+        }
+      });
+      chatInput.addEventListener("input", updateSendEnabled);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", updateKeyboardOffset);
+        window.visualViewport.addEventListener("scroll", updateKeyboardOffset);
+        updateKeyboardOffset();
+      }
+      function syncObserverUI() {
+        chatObserverCheck.classList.toggle("checked", observerMode);
+        chatObserverCheck.textContent = observerMode ? "✓" : "";
+      }
+      chatToggle.addEventListener("click", () => {
+        chatMenu.classList.toggle("active");
+      });
+      chatObserver.addEventListener("click", () => {
+        observerMode = !observerMode;
+        localStorage.setItem("monitorObserver", observerMode ? "1" : "0");
+        syncObserverUI();
+        if (activeChannel) renderChatMessages(activeMessages);
+      });
+      document.addEventListener("click", event => {
+        if (!chatMenu.classList.contains("active")) return;
+        if (event.target.closest("#chat-toggle") || event.target.closest("#chat-menu")) return;
+        chatMenu.classList.remove("active");
+      });
+      let pullStart = 0;
+      const pullThreshold = 120;
+      window.addEventListener("touchstart", (event) => {
+        if (event.touches.length !== 1) return;
+        if (window.scrollY !== 0) return;
+        pullStart = event.touches[0].clientY;
+      }, { passive: true });
+      const refreshCurrentTab = () => {
+        if (!viewThread.classList.contains("hidden") && activeChannel) {
+          openChat(activeChannel, chatName.textContent);
+          return;
+        }
+        if (!viewChat.classList.contains("hidden")) {
+          refreshChats();
+          return;
+        }
+        if (!viewActivity.classList.contains("hidden")) {
+          refreshActivity();
+          return;
+        }
+        refresh();
+      };
+
+      window.addEventListener("touchmove", (event) => {
+        if (!pullStart) return;
+        const current = event.touches[0].clientY;
+        const delta = current - pullStart;
+        if (delta <= 0) return;
+        if (delta > 120) {
+          pullStart = 0;
+          refreshCurrentTab();
+        }
+      }, { passive: true });
+      chatMessages.addEventListener("scroll", async () => {
+        if (!activeChannel || isChatLoading || chatBefore <= 0) return;
+        if (chatMessages.scrollTop > 40) return;
+        isChatLoading = true;
+        chatLoading.classList.remove("hidden");
+        const prevHeight = chatMessages.scrollHeight;
+        try {
+          const res = await fetch(
+            `/api/chat/${encodeURIComponent(activeChannel)}?limit=25&before=${chatBefore}`
+          );
+          const data = await res.json();
+          chatBefore = data.nextBefore || 0;
+          renderChatMessages(data.messages || [], { prepend: true });
+          const nextHeight = chatMessages.scrollHeight;
+          chatMessages.scrollTop = nextHeight - prevHeight;
+        } catch (err) {
+          chatMessages.textContent = "Failed to load messages.";
+        } finally {
+          isChatLoading = false;
+          chatLoading.classList.add("hidden");
+        }
+      });
+      chatFab.addEventListener("click", () => {
+        chatContacts.innerHTML = "";
+        cachedAgents.forEach(agent => {
+          const btn = el("button", "");
+          const avatar = el("img", "avatar-mini");
+          avatar.alt = agent.personDisplayName || agent.agent;
+          avatar.src = `/assets/agents/${agent.agent}.png`;
+          const nameBlock = el("div", "");
+          nameBlock.appendChild(el("div", "contact-name", agent.personDisplayName || agent.agent));
+          nameBlock.appendChild(el("div", "contact-role", agent.roleDisplayName || agent.agent));
+          btn.appendChild(avatar);
+          btn.appendChild(nameBlock);
+          btn.addEventListener("click", () => {
+            chatPicker.classList.remove("active");
+            const channel = channelKey([selfAgent, agent.agent]);
+            openChat(channel, agent.personDisplayName || agent.agent);
+          });
+          chatContacts.appendChild(btn);
+        });
+        chatPicker.classList.add("active");
+      });
+      chatPicker.addEventListener("click", (event) => {
+        if (event.target === chatPicker) {
+          chatPicker.classList.remove("active");
+        }
+      });
+
+      async function restoreState() {
+        const tab = localStorage.getItem("monitorTab") || "status";
+        observerMode = localStorage.getItem("monitorObserver") === "1";
+        syncObserverUI();
+        if (tab === "activity") {
+          setTab("activity");
+          await refreshActivity();
+          return;
+        }
+        const channel = localStorage.getItem("monitorChannel");
+        if (tab === "chat" && channel) {
+          await openChat(channel, "");
+          return;
+        }
+        setTab("status");
+      }
+      updateSendEnabled();
+
+      refresh().then(restoreState);
+      setInterval(refresh, 5000);
+      setInterval(() => {
+        if (!viewChat.classList.contains("hidden") && !activeChannel) {
+          refreshChats();
+        }
+        if (!viewActivity.classList.contains("hidden")) {
+          refreshActivity();
+        }
+      }, 5000);
+      function updateSendEnabled() {
+        const hasText = chatInput.value.trim().length > 0;
+        chatSend.disabled = !hasText;
+      }
+    </script>
+  </body>
+</html>
