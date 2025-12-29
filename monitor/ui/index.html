@@ -1037,6 +1037,10 @@
           <div class="chat-title-row">
             <h2>Settings</h2>
           </div>
+          <div class="card" id="system-status-card">
+            <h3>System status</h3>
+            <div id="system-status-body">Loading status…</div>
+          </div>
           <div class="card">Settings coming soon.</div>
         </section>
         <section id="view-thread" class="hidden">
@@ -1141,6 +1145,7 @@
       const chatEdit = document.getElementById("chat-edit");
       const chatDeleteAction = document.getElementById("chat-delete-action");
       const chatMessages = document.getElementById("chat-messages");
+      const systemStatusBody = document.getElementById("system-status-body");
       const chatInput = document.getElementById("chat-input");
       const chatSend = document.getElementById("chat-send");
       const chatFloating = document.getElementById("chat-floating");
@@ -1166,6 +1171,7 @@
       let editMode = false;
       const selectedChannels = new Set();
       const chatCardRefs = new Map();
+      let lastInboundMessageId = "";
       const pencilIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
       const cancelIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18.3 5.71-1-1L12 9.99 6.72 4.7l-1 1L11 12l-5.28 5.29 1 1L12 14.01l5.29 5.28 1-1L13 12z"/></svg>`;
 
@@ -1494,12 +1500,26 @@
         });
       }
 
+      function scrollThreadToBottom(force = false) {
+        requestAnimationFrame(() => {
+          main.scrollTop = main.scrollHeight;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          if (force) {
+            requestAnimationFrame(() => {
+              main.scrollTop = main.scrollHeight;
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+          }
+        });
+      }
+
       function renderChatMessages(messages, { prepend = false, scrollToBottom = true } = {}) {
         activeMessages = messages;
         if (!prepend) {
           chatMessages.innerHTML = "";
         }
         const participants = activeChannel.includes("__") ? activeChannel.split("__") : [activeChannel];
+        lastInboundMessageId = "";
         messages.forEach(msg => {
           if (!observerMode && !participants.includes(msg.agent)) {
             return;
@@ -1507,6 +1527,9 @@
           const bubble = el("div", "chat-bubble");
           if (msg.agent === selfAgent) {
             bubble.classList.add("self");
+          }
+          if (msg.agent !== selfAgent && msg.id) {
+            lastInboundMessageId = msg.id;
           }
           if (observerMode && msg.agent && msg.agent !== selfAgent) {
             bubble.classList.add("observer");
@@ -1634,6 +1657,19 @@
         }
       }
 
+      async function refreshSystemStatus() {
+        if (!systemStatusBody) return;
+        try {
+          const res = await fetch("/api/system/status");
+          const data = await res.json();
+          const agentd = data.agentd?.running ? "running" : "stopped";
+          const supervisor = data.supervisor?.running ? "running" : "stopped";
+          systemStatusBody.textContent = `agentd: ${agentd} · supervisor: ${supervisor}`;
+        } catch (err) {
+          systemStatusBody.textContent = "Unable to load system status.";
+        }
+      }
+
       async function openChat(channel, displayName) {
         activeChannel = channel;
         const participants = channel.includes("__") ? channel.split("__") : [channel];
@@ -1656,7 +1692,10 @@
           const data = await res.json();
           chatBefore = data.nextBefore || 0;
           renderChatMessages(data.messages || [], { scrollToBottom: true });
-          scrollMessagesToBottom(true);
+          scrollThreadToBottom(true);
+          setTimeout(() => {
+            scrollThreadToBottom(true);
+          }, 50);
         } catch (err) {
           chatMessages.textContent = "Failed to load messages.";
         }
@@ -1703,6 +1742,9 @@
           body: JSON.stringify({ agent: selfAgent, message: msg })
         });
         await openChat(activeChannel, chatName.textContent);
+        if (lastInboundMessageId) {
+          markInboxStatus("read", lastInboundMessageId);
+        }
       }
 
       async function sendChat() {
@@ -1775,9 +1817,15 @@
       });
       tabSettings.addEventListener("click", () => {
         setTab("settings");
+        refreshSystemStatus();
       });
       chatBack.addEventListener("click", closeChat);
       chatSend.addEventListener("click", sendChat);
+      chatMessages.addEventListener("click", () => {
+        if (lastInboundMessageId) {
+          markInboxStatus("read", lastInboundMessageId);
+        }
+      });
       chatRefresh.addEventListener("click", () => sendChatMessage("refresh context", false));
       chatPrewarm.addEventListener("click", async () => {
         await fetch("/api/chat/prewarm", {
@@ -1980,6 +2028,7 @@
         }
         if (tab === "settings") {
           setTab("settings");
+          await refreshSystemStatus();
           return;
         }
         const channel = localStorage.getItem("monitorChannel");
@@ -2011,10 +2060,31 @@
         if (!viewActivity.classList.contains("hidden")) {
           refreshActivity();
         }
+        if (!viewSettings.classList.contains("hidden")) {
+          refreshSystemStatus();
+        }
       }, 5000);
       function updateSendEnabled() {
         const hasText = chatInput.value.trim().length > 0;
         chatSend.disabled = !hasText;
+      }
+
+      async function markInboxStatus(status, messageId) {
+        if (!activeChannel || !messageId) return;
+        try {
+          await fetch("/api/inbox/mark", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              agent: selfAgent,
+              channel: activeChannel,
+              status,
+              message_id: messageId
+            })
+          });
+        } catch {
+          // Ignore failures
+        }
       }
     </script>
   </body>

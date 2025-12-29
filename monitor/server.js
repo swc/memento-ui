@@ -6,6 +6,7 @@ const url = require("url");
 const { spawn, spawnSync } = require("child_process");
 
 const buildId = new Date().toISOString();
+const selfAgent = "product-owner";
 
 function readLink(baseDir, filename) {
   const p = path.join(baseDir, filename);
@@ -36,6 +37,13 @@ const kickScript =
     "baton_kick.sh"
   );
 const agentdSocket = process.env.MEMENTO_AGENTD_SOCKET || "/tmp/memento-agentd.sock";
+const agentdLogPath = path.join(mementoRoot, "state", "agentd.log.jsonl");
+const supervisorLogPath = path.join(mementoRoot, "state", "supervisor.log.jsonl");
+const supervisorLockDir = path.join(mementoRoot, "state", "supervisor.lock");
+const supervisorStateDir = path.join(mementoRoot, "state", "supervisor");
+const inboxDir = path.join(mementoRoot, "state", "inbox");
+const outboxDir = path.join(mementoRoot, "state", "outbox");
+const inboxUpdatesDir = path.join(mementoRoot, "state", "inbox_updates");
 const agentdScript =
   process.env.MEMENTO_AGENTD_SCRIPT ||
   (fs.existsSync(path.resolve(repoRoot, "..", "memento", "scripts", "agentd.py"))
@@ -141,13 +149,14 @@ function appendChatMessage(channel, agent, message) {
   if (!fs.existsSync(chatDir)) {
     fs.mkdirSync(chatDir, { recursive: true });
   }
+  const normalized = normalizeChannel(channel);
   const entry = {
     ts: new Date().toISOString(),
     channel,
     agent,
     message: String(message)
   };
-  fs.appendFileSync(path.join(chatDir, `${channel}.log`), `${JSON.stringify(entry)}\n`);
+  fs.appendFileSync(path.join(chatDir, `${normalized}.log`), `${JSON.stringify(entry)}\n`);
   return entry;
 }
 
@@ -157,18 +166,17 @@ function buildChatSummary(agents) {
   agents.forEach(agent => {
     agentMap[agent.id] = agent;
   });
-  const selfAgent = "product-owner";
   const channels = listChatChannels();
   const summaries = new Map();
   channels.forEach(channel => {
     const participants = parseParticipants(channel);
     if (!participants.includes(selfAgent)) return;
-    const normalized = [...participants].sort().join("__");
-    const messages = readChatChannel(channel);
+    const normalized = canonicalChannel(participants);
+    const messages = readChatChannel(normalized);
     const last = messages[messages.length - 1] || null;
     const otherAgent = participants.find(p => p !== selfAgent) || selfAgent;
     const entry = {
-      channel,
+      channel: normalized,
       lastMessage: last ? last.message : "",
       lastTs: last ? last.ts : "",
       agent: agentMap[otherAgent] || null,
@@ -290,12 +298,42 @@ function serveJson(res, data) {
   res.end(body);
 }
 
+function pathExists(p) {
+  try {
+    fs.accessSync(p, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function appendJsonLog(filePath, entry) {
+  try {
+    const line = `${JSON.stringify(entry)}\n`;
+    fs.appendFileSync(filePath, line);
+  } catch {
+    // Ignore logging failures
+  }
+}
+
 function callAgentd(payload) {
   if (!fs.existsSync(agentdScript)) return false;
   const result = spawnSync("python3", [agentdScript, "once", JSON.stringify(payload)], {
     env: { ...process.env, MEMENTO_ROOT: mementoRoot },
-    stdio: "ignore",
-    timeout: 5000
+    timeout: 15000,
+    encoding: "utf-8"
+  });
+  appendJsonLog(agentdLogPath, {
+    ts: new Date().toISOString(),
+    ok: result.status === 0,
+    status: result.status,
+    signal: result.signal,
+    timeout: result.error?.code === "ETIMEDOUT",
+    cmd: payload?.cmd || "",
+    agent: payload?.agent || "",
+    channel: payload?.channel || "",
+    stdout: (result.stdout || "").slice(0, 2000),
+    stderr: (result.stderr || "").slice(0, 2000)
   });
   return result.status === 0;
 }
@@ -303,6 +341,22 @@ function callAgentd(payload) {
 function parseParticipants(channel) {
   if (!channel.includes("__")) return [channel];
   return channel.split("__").map(part => part.trim()).filter(Boolean);
+}
+
+function canonicalChannel(participants) {
+  if (!Array.isArray(participants)) return "";
+  const uniq = Array.from(new Set(participants.filter(Boolean)));
+  if (!uniq.length) return "";
+  if (uniq.includes(selfAgent)) {
+    const other = uniq.filter(p => p !== selfAgent).sort();
+    return [selfAgent, ...other].join("__");
+  }
+  return uniq.sort().join("__");
+}
+
+function normalizeChannel(channel) {
+  const participants = parseParticipants(channel);
+  return canonicalChannel(participants) || channel;
 }
 
 function isEndPhrase(message) {
@@ -436,6 +490,59 @@ function handler(req, res) {
     return serveJson(res, { entries });
   }
 
+  if (parsed.pathname === "/api/system/status") {
+    const agentdRunning = pathExists(agentdSocket);
+    const supervisorRunning = pathExists(supervisorLockDir);
+    const supervisorState = pathExists(supervisorStateDir);
+    return serveJson(res, {
+      agentd: { running: agentdRunning, socket: agentdSocket },
+      supervisor: { running: supervisorRunning, lockDir: supervisorLockDir, stateDir: supervisorStateDir },
+      ts: new Date().toISOString()
+    });
+  }
+
+  if (parsed.pathname === "/api/inbox/mark" && req.method === "POST") {
+    return readRequestBody(req, raw => {
+      let payload = null;
+      try {
+        payload = JSON.parse(raw || "{}");
+      } catch {
+        payload = null;
+      }
+      if (!payload || !payload.agent || !payload.channel || !payload.status || !payload.message_id) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Invalid payload");
+        return;
+      }
+      const agent = String(payload.agent);
+      const entry = {
+        ts: new Date().toISOString(),
+        agent,
+        channel: String(payload.channel),
+        status: String(payload.status),
+        message_id: String(payload.message_id)
+      };
+      try {
+        fs.mkdirSync(inboxUpdatesDir, { recursive: true });
+        fs.appendFileSync(path.join(inboxUpdatesDir, `${agent}.jsonl`), `${JSON.stringify(entry)}\n`);
+      } catch {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("Failed to write inbox update");
+        return;
+      }
+      if (agentdSocket && fs.existsSync(agentdSocket)) {
+        callAgentd({
+          cmd: "chat_mark",
+          agent: entry.agent,
+          channel: entry.channel,
+          status: entry.status,
+          message_id: entry.message_id
+        });
+      }
+      return serveJson(res, { ok: true });
+    });
+  }
+
   if (parsed.pathname === "/api/chat/prewarm" && req.method === "POST") {
     return readRequestBody(req, raw => {
       let payload = null;
@@ -457,13 +564,14 @@ function handler(req, res) {
 
   if (parsed.pathname && parsed.pathname.startsWith("/api/chat/")) {
     const channel = decodeURIComponent(parsed.pathname.replace("/api/chat/", ""));
+    const normalizedChannel = normalizeChannel(channel);
     if (!channel) {
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Missing channel");
       return;
     }
     if (req.method === "GET") {
-      const messages = readChatChannel(channel);
+      const messages = readChatChannel(normalizedChannel);
       const limit = Math.max(1, Math.min(100, Number(parsed.query.limit) || 25));
       const before = Math.max(0, Number(parsed.query.before) || 0);
       const total = messages.length;
@@ -471,10 +579,10 @@ function handler(req, res) {
       const start = Math.max(0, end - limit);
       const slice = messages.slice(start, end);
       const nextBefore = total - start;
-      return serveJson(res, { channel, messages: slice, total, nextBefore });
+      return serveJson(res, { channel: normalizedChannel, messages: slice, total, nextBefore });
     }
     if (req.method === "DELETE") {
-      const p = path.join(chatDir, `${channel}.log`);
+      const p = path.join(chatDir, `${normalizedChannel}.log`);
       if (!fs.existsSync(p)) {
         return serveJson(res, { ok: true, deleted: 0 });
       }
@@ -503,8 +611,8 @@ function handler(req, res) {
           res.end("Invalid payload");
           return;
         }
-        const entry = appendChatMessage(channel, payload.agent, payload.message);
-        const participants = parseParticipants(channel);
+        const entry = appendChatMessage(normalizedChannel, payload.agent, payload.message);
+        const participants = parseParticipants(normalizedChannel);
         const sender = payload.agent;
         const recipients = participants.filter(p => p && p !== sender);
         if (sender !== "product-owner") {
@@ -516,15 +624,29 @@ function handler(req, res) {
           });
         }
         recipients.forEach(agentId => {
-          const key = `${agentId}::${channel}`;
+          const key = `${agentId}::${normalizedChannel}`;
           chatSessionState.set(key, Date.now());
-          startChatSession(agentId, channel, sender, payload.message);
+          startChatSession(agentId, normalizedChannel, sender, payload.message);
+          appendJsonLog(supervisorLogPath, {
+            ts: new Date().toISOString(),
+            event: "chat_start",
+            agent: agentId,
+            channel: normalizedChannel,
+            sender
+          });
         });
         if (sender === "product-owner" && isEndPhrase(payload.message)) {
           recipients.forEach(agentId => {
-            const key = `${agentId}::${channel}`;
+            const key = `${agentId}::${normalizedChannel}`;
             chatSessionState.delete(key);
-            stopChatSession(agentId, channel);
+            stopChatSession(agentId, normalizedChannel);
+            appendJsonLog(supervisorLogPath, {
+              ts: new Date().toISOString(),
+              event: "chat_stop",
+              agent: agentId,
+              channel: normalizedChannel,
+              sender
+            });
           });
         }
         return serveJson(res, { ok: true });
