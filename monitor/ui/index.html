@@ -468,6 +468,17 @@
         font-size: 17px;
         font-weight: 700;
       }
+      .chat-title-line {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .chat-title-line .role-inline {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+      }
       .chat-card .role {
         margin: 2px 0 0;
         font-size: 13px;
@@ -750,7 +761,7 @@
         border-radius: 18px;
         background: #e6e0f5;
         color: #1b1b1b;
-        font-size: 14px;
+        font-size: 15px;
       }
       .chat-bubble .sender {
         display: block;
@@ -1022,6 +1033,12 @@
           </div>
           <div id="activity-list" class="activity-list"></div>
         </section>
+        <section id="view-settings" class="hidden">
+          <div class="chat-title-row">
+            <h2>Settings</h2>
+          </div>
+          <div class="card">Settings coming soon.</div>
+        </section>
         <section id="view-thread" class="hidden">
           <button id="chat-back" class="chat-back" type="button" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1101,9 +1118,11 @@
       const tabStatus = document.getElementById("tab-status");
       const tabChat = document.getElementById("tab-chat");
       const tabActivity = document.getElementById("tab-activity");
+      const tabSettings = document.getElementById("tab-settings");
       const viewStatus = document.getElementById("view-status");
       const viewChat = document.getElementById("view-chat");
       const viewActivity = document.getElementById("view-activity");
+      const viewSettings = document.getElementById("view-settings");
       const viewThread = document.getElementById("view-thread");
       const chatList = document.getElementById("chat-list");
       const chatFab = document.getElementById("chat-fab");
@@ -1362,11 +1381,14 @@
       function setTab(tab) {
         const isChat = tab === "chat";
         const isActivity = tab === "activity";
+        const isSettings = tab === "settings";
         tabStatus.classList.toggle("active", tab === "status");
         tabChat.classList.toggle("active", isChat);
         tabActivity.classList.toggle("active", isActivity);
+        tabSettings.classList.toggle("active", isSettings);
         viewStatus.classList.toggle("hidden", tab !== "status");
         viewActivity.classList.toggle("hidden", !isActivity);
+        viewSettings.classList.toggle("hidden", !isSettings);
         viewChat.classList.toggle("hidden", !isChat || !!activeChannel);
         viewThread.classList.toggle("hidden", !activeChannel || !isChat);
         chatFab.classList.toggle("hidden", !isChat || !!activeChannel);
@@ -1411,11 +1433,13 @@
           const textBody = el("div", "");
           const time = channel.lastTs ? new Date(channel.lastTs).toLocaleTimeString() : "";
           const last = channel.lastMessage || "No messages yet";
-          textBody.appendChild(el("h3", "", display));
           const roleLabel = agentMeta?.roleDisplayName || "";
+          const titleLine = el("div", "chat-title-line");
+          titleLine.appendChild(el("h3", "", display));
           if (roleLabel) {
-            textBody.appendChild(el("div", "role", roleLabel));
+            titleLine.appendChild(el("span", "role-inline", `— ${roleLabel}`));
           }
+          textBody.appendChild(titleLine);
           textBody.appendChild(el("p", "", last));
           card.appendChild(checkbox);
           card.appendChild(avatar);
@@ -1749,6 +1773,9 @@
         setTab("activity");
         refreshActivity();
       });
+      tabSettings.addEventListener("click", () => {
+        setTab("settings");
+      });
       chatBack.addEventListener("click", closeChat);
       chatSend.addEventListener("click", sendChat);
       chatRefresh.addEventListener("click", () => sendChatMessage("refresh context", false));
@@ -1825,14 +1852,21 @@
           window.location.reload();
         }, 120);
       };
-      const getPullScrollEl = () => {
-        if (!viewThread.classList.contains("hidden")) return chatMessages;
-        return main;
-      };
+      const getPullScrollEl = () => main;
       main.addEventListener("touchstart", (event) => {
         if (event.touches.length !== 1) return;
         activeScrollEl = getPullScrollEl();
         if (!activeScrollEl || activeScrollEl.scrollTop > 0) {
+          canPull = false;
+          return;
+        }
+        if (!viewThread.classList.contains("hidden") && chatMessages.scrollTop > 0) {
+          canPull = false;
+          return;
+        }
+        const touchY = event.touches[0].clientY;
+        const rect = main.getBoundingClientRect();
+        if (!viewThread.classList.contains("hidden") && touchY < (rect.top + 120)) {
           canPull = false;
           return;
         }
@@ -1944,9 +1978,18 @@
           await refreshActivity();
           return;
         }
+        if (tab === "settings") {
+          setTab("settings");
+          return;
+        }
         const channel = localStorage.getItem("monitorChannel");
-        if (tab === "chat" && channel) {
-          await openChat(channel, "");
+        if (tab === "chat") {
+          if (channel) {
+            await openChat(channel, "");
+            return;
+          }
+          setTab("chat");
+          await refreshChats();
           return;
         }
         setTab("status");
