@@ -35,7 +35,7 @@
         background-attachment: fixed;
         background-repeat: no-repeat;
         background-size: cover;
-        overflow-y: auto;
+        overflow: hidden;
       }
       .app {
         background: transparent;
@@ -61,7 +61,7 @@
       }
       main {
         flex: 1;
-        padding: 12px 16px 90px;
+        padding: 12px 16px 30px;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
@@ -89,10 +89,11 @@
         text-transform: uppercase;
         transition: top 160ms ease, opacity 160ms ease;
         opacity: 0;
-        z-index: 12;
+        z-index: 90;
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        pointer-events: none;
       }
       #pull-indicator .spinner {
         width: 12px;
@@ -281,7 +282,7 @@
         font-style: italic;
       }
       footer {
-        padding: 8px 16px 84px;
+        padding: 8px 16px 90Ok, sopx;
         color: var(--header-ink);
         font-size: 13px;
         opacity: 0.8;
@@ -323,11 +324,23 @@
         color: #7ed1ff;
       }
       .refresh-time {
+        color: rgb(165, 165, 165);
+        font-size: small;
         margin-left: 0.5em;
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        z-index: 100;
       }
       .build-tag {
+        color: rgb(165, 165, 165);
+        font-size: small;
         float: right;
         margin-right: 1em;
+        position: fixed;
+        right: 10px;
+        bottom: 10px;
+        z-index: 100;
       }
       nav .icon {
         width: 22px;
@@ -915,6 +928,7 @@
     </style>
   </head>
   <body>
+    <div>
     <nav>
       <button id="tab-status" class="active" type="button" aria-label="Status">
         <span class="icon">
@@ -949,6 +963,8 @@
         <span class="label">Settings</span>
       </button>
     </nav>
+      <span id="refresh-time" class="refresh-time"></span><span id="build-tag" class="build-tag"></span>
+    </div>
     <div class="app">
       <main>
         <section id="view-status">
@@ -1015,10 +1031,6 @@
             <img id="chat-avatar" class="avatar" alt="" />
             <div id="chat-name" class="chat-name"></div>
           </div>
-          <div id="pull-indicator">
-            <span class="spinner"></span>
-            <span>Pull to refresh</span>
-          </div>
           <div class="chat-thread">
             <div id="chat-loading" class="chat-loading hidden">Loading older messages…</div>
             <div id="chat-messages"></div>
@@ -1043,6 +1055,10 @@
           </div>
         </section>
       </main>
+      <div id="pull-indicator">
+        <span class="spinner"></span>
+        <span>Pull to refresh</span>
+      </div>
       <button id="chat-fab" class="fab hidden" type="button">+</button>
       <div id="chat-picker" class="contact-picker">
         <div class="contact-card">
@@ -1052,7 +1068,7 @@
       </div>
       <div id="overlay" class="overlay"></div>
       <div id="fullscreen-chip" class="fullscreen-chip hidden"></div>
-      <footer id="foot"><span id="refresh-time" class="refresh-time"></span><span id="build-tag" class="build-tag"></span></footer>
+      <footer id="foot"></footer>
     </div>
     <script src="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.umd.js"></script>
     <script>
@@ -1751,6 +1767,7 @@
       let pullStart = 0;
       let pullDelta = 0;
       let triggered = false;
+      let pulling = false;
       const refreshCurrentTab = () => {
         pullIndicator.classList.add("refreshing");
         if (!viewThread.classList.contains("hidden") && activeChannel) {
@@ -1767,52 +1784,54 @@
         }
         refresh();
       };
-      if (window.navigator.standalone && window.PullToRefresh) {
-        PullToRefresh.init({
-          mainElement: "main",
-          triggerElement: "main",
-          distThreshold: pullThreshold,
-          onRefresh() {
-            setPullIndicator("refresh", "Refreshing...");
-            refreshCurrentTab();
-          }
-        });
-      } else if (!window.navigator.standalone) {
-        main.addEventListener("touchstart", (event) => {
-          if (event.touches.length !== 1) return;
-          if (main.scrollTop > 0) return;
-          pullStart = event.touches[0].clientY;
-        }, { passive: true });
+      const triggerFullRefresh = () => {
+        setPullIndicator("refresh", "Refreshing...");
+        setTimeout(() => {
+          window.location.reload();
+        }, 120);
+      };
+      main.addEventListener("touchstart", (event) => {
+        if (event.touches.length !== 1) return;
+        if (main.scrollTop > 0) return;
+        pulling = false;
+        triggered = false;
+        pullStart = event.touches[0].clientY;
+        main.style.transition = "none";
+      }, { passive: true });
 
-        main.addEventListener("touchmove", (event) => {
-          if (main.scrollTop > 0) return;
-          const current = event.touches[0].clientY;
-          const delta = current - pullStart;
-          pullDelta = delta;
-          if (delta <= 0) {
-            setPullIndicator("idle");
-            return;
-          }
-          event.preventDefault();
-          setPullIndicator("pull", "Pull to refresh");
-          if (!triggered && delta > pullThreshold) {
-            triggered = true;
-            setPullIndicator("refresh", "Refreshing...");
-            refreshCurrentTab();
-          }
-        }, { passive: false });
-
-        main.addEventListener("touchend", () => {
+      main.addEventListener("touchmove", (event) => {
+        if (main.scrollTop > 0) return;
+        const current = event.touches[0].clientY;
+        const delta = current - pullStart;
+        pullDelta = delta;
+        if (delta <= 0) {
           setPullIndicator("idle");
-          if (!triggered && pullDelta > pullThreshold) {
-            setPullIndicator("refresh", "Refreshing...");
-            refreshCurrentTab();
-          }
-          pullStart = 0;
-          pullDelta = 0;
-          triggered = false;
-        });
-      }
+          pulling = false;
+          main.style.transform = "";
+          return;
+        }
+        if (!pulling && delta < 6) return;
+        pulling = true;
+        event.preventDefault();
+        const offset = Math.min(delta, 120);
+        main.style.transform = `translateY(${offset}px)`;
+        setPullIndicator("pull", "Pull to refresh");
+        if (!triggered && delta > pullThreshold) {
+          triggered = true;
+          setPullIndicator("refresh", "Refreshing...");
+        }
+      }, { passive: false });
+
+      main.addEventListener("touchend", () => {
+        setPullIndicator("idle");
+        main.style.transition = "transform 180ms ease";
+        main.style.transform = "";
+        if (triggered) triggerFullRefresh();
+        pullStart = 0;
+        pullDelta = 0;
+        triggered = false;
+        pulling = false;
+      });
       chatMessages.addEventListener("scroll", async () => {
         if (!activeChannel || isChatLoading || chatBefore <= 0) return;
         if (chatMessages.scrollTop > 40) return;
@@ -1880,9 +1899,11 @@
       }
       updateSendEnabled();
 
-      if (buildTag && window.__MONITOR_BUILD__) {
-        buildTag.textContent = `build ${window.__MONITOR_BUILD__}`;
+      function updatePageLoadedTag() {
+        if (!buildTag) return;
+        buildTag.textContent = `loaded ${new Date().toLocaleTimeString()}`;
       }
+      updatePageLoadedTag();
 
       refresh().then(restoreState);
       setInterval(refresh, 5000);

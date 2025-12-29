@@ -371,10 +371,10 @@ function readRequestBody(req, cb) {
 
 function serveIndex(res) {
   const html = fs.readFileSync(path.join(__dirname, "ui", "index.html"), "utf-8");
-  const stamped = html.replace(
-    "</body>",
-    `<script>window.__MONITOR_BUILD__=${JSON.stringify(buildId)};</script></body>`
-  );
+  const stamp = `<script>window.__MONITOR_BUILD__=${JSON.stringify(buildId)};</script>`;
+  const stamped = html.includes("</head>")
+    ? html.replace("</head>", `${stamp}</head>`)
+    : html.replace("</body>", `${stamp}</body>`);
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(stamped);
 }
