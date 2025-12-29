@@ -5,6 +5,8 @@ const path = require("path");
 const url = require("url");
 const { spawn, spawnSync } = require("child_process");
 
+const buildId = new Date().toISOString();
+
 function readLink(baseDir, filename) {
   const p = path.join(baseDir, filename);
   if (!fs.existsSync(p)) return "";
@@ -14,18 +16,11 @@ function readLink(baseDir, filename) {
 }
 
 function resolveMementoRoot(baseDir) {
-  if (fs.existsSync(path.join(baseDir, ".memento"))) {
-    return path.join(baseDir, ".memento");
-  }
   const direct = readLink(baseDir, ".memento-root");
-  if (direct) return direct;
-  const parent = path.dirname(baseDir);
-  const sibling = path.join(parent, `${path.basename(baseDir)}-memento`, ".memento");
-  if (fs.existsSync(sibling)) return sibling;
-  return path.join(baseDir, ".memento");
+  return direct;
 }
 const repoRoot = path.resolve(__dirname, "..");
-const mementoRoot = process.env.MEMENTO_ROOT || resolveMementoRoot(repoRoot);
+const mementoRoot = resolveMementoRoot(repoRoot);
 const activityDir = path.join(mementoRoot, "state", "activity");
 const chatDir = path.join(mementoRoot, "state", "chat");
 const configPath = path.join(mementoRoot, "config.json");
@@ -376,8 +371,12 @@ function readRequestBody(req, cb) {
 
 function serveIndex(res) {
   const html = fs.readFileSync(path.join(__dirname, "ui", "index.html"), "utf-8");
+  const stamped = html.replace(
+    "</body>",
+    `<script>window.__MONITOR_BUILD__=${JSON.stringify(buildId)};</script></body>`
+  );
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(html);
+  res.end(stamped);
 }
 
 function serveAsset(res, relPath) {

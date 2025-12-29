@@ -35,6 +35,7 @@
         background-attachment: fixed;
         background-repeat: no-repeat;
         background-size: cover;
+        overflow-y: auto;
       }
       .app {
         background: transparent;
@@ -61,10 +62,56 @@
       main {
         flex: 1;
         padding: 12px 16px 90px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        touch-action: pan-y;
+        overscroll-behavior-y: contain;
+      }
+      main::-webkit-scrollbar {
+        display: none;
       }
       .grid {
         display: grid;
         gap: 12px;
+      }
+      #pull-indicator {
+        position: fixed;
+        top: -40px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition: top 160ms ease, opacity 160ms ease;
+        opacity: 0;
+        z-index: 12;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #pull-indicator .spinner {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: rgba(255,255,255,0.9);
+        animation: spin 0.8s linear infinite;
+      }
+      #pull-indicator.active {
+        top: 14px;
+        opacity: 1;
+      }
+      #pull-indicator.refreshing .spinner {
+        animation-play-state: running;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
       .card {
         background: var(--panel);
@@ -134,7 +181,7 @@
         width: min(92vw, 420px);
         height: min(92vw, 420px);
         border-radius: 24px;
-        z-index: 20;
+        z-index: 80;
         box-shadow: 0 18px 50px rgba(0,0,0,0.45);
       }
       .overlay {
@@ -149,6 +196,10 @@
       .overlay.active {
         opacity: 1;
         pointer-events: auto;
+      }
+      .overlay.hidden {
+        opacity: 0 !important;
+        pointer-events: none;
       }
       .title {
         display: flex;
@@ -230,7 +281,7 @@
         font-style: italic;
       }
       footer {
-        padding: 8px 16px 24px;
+        padding: 8px 16px 84px;
         color: var(--header-ink);
         font-size: 13px;
         opacity: 0.8;
@@ -270,6 +321,13 @@
       }
       nav button.active {
         color: #7ed1ff;
+      }
+      .refresh-time {
+        margin-left: 0.5em;
+      }
+      .build-tag {
+        float: right;
+        margin-right: 1em;
       }
       nav .icon {
         width: 22px;
@@ -412,18 +470,21 @@
         border-radius: 0;
         padding: 170px 16px 90px;
         min-height: calc(100vh - 210px);
-        max-height: calc(100vh - 210px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
       }
       #chat-messages {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
+        justify-content: flex-end;
         gap: 12px;
         padding-top: 220px;
         padding-bottom: calc(120px + var(--keyboard-offset));
         width: 100%;
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
       .chat-floating {
         position: fixed;
@@ -437,7 +498,7 @@
         pointer-events: none;
       }
       .chat-floating.fullscreen {
-        z-index: 21;
+        z-index: 70;
       }
       .chat-floating img {
         pointer-events: auto;
@@ -954,6 +1015,10 @@
             <img id="chat-avatar" class="avatar" alt="" />
             <div id="chat-name" class="chat-name"></div>
           </div>
+          <div id="pull-indicator">
+            <span class="spinner"></span>
+            <span>Pull to refresh</span>
+          </div>
           <div class="chat-thread">
             <div id="chat-loading" class="chat-loading hidden">Loading older messages…</div>
             <div id="chat-messages"></div>
@@ -963,11 +1028,12 @@
               id="chat-input"
               type="text"
               placeholder="Message"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"
-              spellcheck="false"
+              autocomplete="on"
+              autocorrect="on"
+              autocapitalize="sentences"
+              spellcheck="true"
               enterkeyhint="send"
+              tabindex="-1"
             />
             <button id="chat-send" type="button" aria-label="Send message">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -986,14 +1052,16 @@
       </div>
       <div id="overlay" class="overlay"></div>
       <div id="fullscreen-chip" class="fullscreen-chip hidden"></div>
-      <footer id="foot"></footer>
+      <footer id="foot"><span id="refresh-time" class="refresh-time"></span><span id="build-tag" class="build-tag"></span></footer>
     </div>
+    <script src="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.umd.js"></script>
     <script>
       document.addEventListener("gesturestart", event => event.preventDefault());
       document.addEventListener("gesturechange", event => event.preventDefault());
       document.addEventListener("gestureend", event => event.preventDefault());
 
       const grid = document.getElementById("grid");
+      const main = document.querySelector("main");
       const foot = document.getElementById("foot");
       const overlay = document.getElementById("overlay");
       const fullscreenChip = document.getElementById("fullscreen-chip");
@@ -1015,6 +1083,9 @@
       const chatObserverCheck = document.getElementById("chat-observer-check");
       const chatPrewarm = document.getElementById("chat-prewarm");
       const chatDelete = document.getElementById("chat-delete");
+      const pullIndicator = document.getElementById("pull-indicator");
+      const buildTag = document.getElementById("build-tag");
+      const refreshTime = document.getElementById("refresh-time");
       const chatEdit = document.getElementById("chat-edit");
       const chatDeleteAction = document.getElementById("chat-delete-action");
       const chatMessages = document.getElementById("chat-messages");
@@ -1029,6 +1100,7 @@
       let fullscreenAvatar = null;
       let fullscreenAgentId = null;
       let cachedAgents = [];
+      let cachedChatSummaries = new Map();
       let activeChannel = "";
       const channelKey = (participants) =>
         [...participants].sort().join("__");
@@ -1056,6 +1128,20 @@
       function updateDeleteActionState() {
         chatDeleteAction.disabled = selectedChannels.size === 0;
         chatDeleteAction.classList.toggle("hidden", !editMode);
+      }
+
+      function setPullIndicator(state, label = "") {
+        if (!pullIndicator) return;
+        if (label) {
+          const labelEl = pullIndicator.querySelector("span:last-child");
+          if (labelEl) labelEl.textContent = label;
+        }
+        pullIndicator.classList.toggle("active", state === "pull");
+        pullIndicator.classList.toggle("refreshing", state === "refresh");
+        if (state === "idle") {
+          pullIndicator.classList.remove("active");
+          pullIndicator.classList.remove("refreshing");
+        }
       }
 
       chatEdit.innerHTML = pencilIcon;
@@ -1190,8 +1276,7 @@
         const row6 = el("div", "row inline");
         const chatBtn = el("button", "chat-btn", "Chat");
         chatBtn.addEventListener("click", () => {
-          const channel = channelKey([selfAgent, agent.agent]);
-          openChat(channel, agent.personDisplayName || agent.agent);
+          openChatForAgent(agent.agent, agent.personDisplayName || agent.agent);
         });
         const nudgeBtn = el("button", "nudge-btn", "Nudge");
         nudgeBtn.addEventListener("click", async () => {
@@ -1216,6 +1301,7 @@
         fullscreenAvatar = isActive ? target : null;
         fullscreenAgentId = isActive ? target.dataset.agent : null;
         overlay.classList.toggle("active", isActive);
+        overlay.classList.toggle("hidden", isActive);
         if (isActive) {
           fullscreenChip.textContent = target.alt || target.dataset.agent || "";
           fullscreenChip.classList.remove("hidden");
@@ -1234,6 +1320,7 @@
           fullscreenAgentId = null;
         }
         overlay.classList.remove("active");
+        overlay.classList.remove("hidden");
         fullscreenChip.classList.add("hidden");
       });
 
@@ -1427,9 +1514,17 @@
         try {
           const res = await fetch("/api/chat/summary");
           const data = await res.json();
+          cachedChatSummaries = new Map();
+          (data.channels || []).forEach(channel => {
+            if (channel.otherAgentId) {
+              cachedChatSummaries.set(channel.otherAgentId, channel);
+            }
+          });
           renderChatSummary(data.channels || []);
         } catch (err) {
           chatList.textContent = "Failed to load chats.";
+        } finally {
+          setPullIndicator("idle");
         }
       }
 
@@ -1463,6 +1558,8 @@
           }
         } catch (err) {
           activityList.textContent = "Failed to load activity.";
+        } finally {
+          setPullIndicator("idle");
         }
       }
 
@@ -1487,7 +1584,9 @@
           const res = await fetch(`/api/chat/${encodeURIComponent(channel)}?limit=25`);
           const data = await res.json();
           chatBefore = data.nextBefore || 0;
-          renderChatMessages(data.messages || []);
+          renderChatMessages(data.messages || [], { scrollToBottom: true });
+          scrollMessagesToBottom();
+          requestAnimationFrame(scrollMessagesToBottom);
         } catch (err) {
           chatMessages.textContent = "Failed to load messages.";
         }
@@ -1570,10 +1669,22 @@
               overlay.classList.remove("active");
             }
           }
-          foot.textContent = `Last refresh: ${new Date().toLocaleTimeString()}`;
+          if (refreshTime) {
+            refreshTime.textContent = `Last refresh: ${new Date().toLocaleTimeString()}`;
+          }
         } catch (err) {
-          foot.textContent = "Failed to load data";
+          if (refreshTime) {
+            refreshTime.textContent = "Failed to load data";
+          }
+        } finally {
+          setPullIndicator("idle");
         }
+      }
+
+      function openChatForAgent(agentId, displayName) {
+        const summary = cachedChatSummaries.get(agentId);
+        const channel = summary?.channel || channelKey([selfAgent, agentId]);
+        openChat(channel, displayName);
       }
 
       tabStatus.addEventListener("click", () => {
@@ -1636,14 +1747,12 @@
         if (event.target.closest("#chat-toggle") || event.target.closest("#chat-menu")) return;
         chatMenu.classList.remove("active");
       });
+      const pullThreshold = 80;
       let pullStart = 0;
-      const pullThreshold = 120;
-      window.addEventListener("touchstart", (event) => {
-        if (event.touches.length !== 1) return;
-        if (window.scrollY !== 0) return;
-        pullStart = event.touches[0].clientY;
-      }, { passive: true });
+      let pullDelta = 0;
+      let triggered = false;
       const refreshCurrentTab = () => {
+        pullIndicator.classList.add("refreshing");
         if (!viewThread.classList.contains("hidden") && activeChannel) {
           openChat(activeChannel, chatName.textContent);
           return;
@@ -1658,17 +1767,52 @@
         }
         refresh();
       };
+      if (window.navigator.standalone && window.PullToRefresh) {
+        PullToRefresh.init({
+          mainElement: "main",
+          triggerElement: "main",
+          distThreshold: pullThreshold,
+          onRefresh() {
+            setPullIndicator("refresh", "Refreshing...");
+            refreshCurrentTab();
+          }
+        });
+      } else if (!window.navigator.standalone) {
+        main.addEventListener("touchstart", (event) => {
+          if (event.touches.length !== 1) return;
+          if (main.scrollTop > 0) return;
+          pullStart = event.touches[0].clientY;
+        }, { passive: true });
 
-      window.addEventListener("touchmove", (event) => {
-        if (!pullStart) return;
-        const current = event.touches[0].clientY;
-        const delta = current - pullStart;
-        if (delta <= 0) return;
-        if (delta > 120) {
+        main.addEventListener("touchmove", (event) => {
+          if (main.scrollTop > 0) return;
+          const current = event.touches[0].clientY;
+          const delta = current - pullStart;
+          pullDelta = delta;
+          if (delta <= 0) {
+            setPullIndicator("idle");
+            return;
+          }
+          event.preventDefault();
+          setPullIndicator("pull", "Pull to refresh");
+          if (!triggered && delta > pullThreshold) {
+            triggered = true;
+            setPullIndicator("refresh", "Refreshing...");
+            refreshCurrentTab();
+          }
+        }, { passive: false });
+
+        main.addEventListener("touchend", () => {
+          setPullIndicator("idle");
+          if (!triggered && pullDelta > pullThreshold) {
+            setPullIndicator("refresh", "Refreshing...");
+            refreshCurrentTab();
+          }
           pullStart = 0;
-          refreshCurrentTab();
-        }
-      }, { passive: true });
+          pullDelta = 0;
+          triggered = false;
+        });
+      }
       chatMessages.addEventListener("scroll", async () => {
         if (!activeChannel || isChatLoading || chatBefore <= 0) return;
         if (chatMessages.scrollTop > 40) return;
@@ -1735,6 +1879,10 @@
         setTab("status");
       }
       updateSendEnabled();
+
+      if (buildTag && window.__MONITOR_BUILD__) {
+        buildTag.textContent = `build ${window.__MONITOR_BUILD__}`;
+      }
 
       refresh().then(restoreState);
       setInterval(refresh, 5000);
