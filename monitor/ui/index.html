@@ -23,7 +23,6 @@
       html {
         min-height: 100%;
         background: #000;
-        overscroll-behavior-y: contain;
       }
       body {
         min-height: 100%;
@@ -66,7 +65,7 @@
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         touch-action: pan-y;
-        overscroll-behavior-y: contain;
+        min-height: 0;
       }
       main::-webkit-scrollbar {
         display: none;
@@ -485,6 +484,7 @@
         min-height: calc(100vh - 210px);
         display: flex;
         flex-direction: column;
+        min-height: 0;
       }
       #chat-messages {
         display: flex;
@@ -498,6 +498,7 @@
         flex: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        min-height: 0;
       }
       .chat-floating {
         position: fixed;
@@ -1436,9 +1437,14 @@
         chatDeleteAction.classList.toggle("hidden", !editMode);
       }
 
-      function scrollMessagesToBottom() {
+      function scrollMessagesToBottom(force = false) {
         requestAnimationFrame(() => {
           chatMessages.scrollTop = chatMessages.scrollHeight;
+          if (force) {
+            requestAnimationFrame(() => {
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+          }
         });
       }
 
@@ -1479,7 +1485,7 @@
         }
       });
         if (!prepend && scrollToBottom) {
-          scrollMessagesToBottom();
+          scrollMessagesToBottom(true);
         }
         updateTypingIndicator(activeMessages);
       }
@@ -1601,8 +1607,7 @@
           const data = await res.json();
           chatBefore = data.nextBefore || 0;
           renderChatMessages(data.messages || [], { scrollToBottom: true });
-          scrollMessagesToBottom();
-          requestAnimationFrame(scrollMessagesToBottom);
+          scrollMessagesToBottom(true);
         } catch (err) {
           chatMessages.textContent = "Failed to load messages.";
         }
@@ -1623,6 +1628,7 @@
         chatFab.classList.remove("hidden");
         chatMenu.classList.remove("active");
         localStorage.removeItem("monitorChannel");
+        setTab("chat");
       }
 
       async function sendChatMessage(msg, clearInput = true) {
@@ -1768,6 +1774,9 @@
       let pullDelta = 0;
       let triggered = false;
       let pulling = false;
+      let canPull = false;
+      let activeScrollEl = null;
+      let pullVisibleAt = 0;
       const refreshCurrentTab = () => {
         pullIndicator.classList.add("refreshing");
         if (!viewThread.classList.contains("hidden") && activeChannel) {
@@ -1790,47 +1799,66 @@
           window.location.reload();
         }, 120);
       };
+      const getPullScrollEl = () => {
+        if (!viewThread.classList.contains("hidden")) return chatMessages;
+        return main;
+      };
       main.addEventListener("touchstart", (event) => {
         if (event.touches.length !== 1) return;
-        if (main.scrollTop > 0) return;
+        activeScrollEl = getPullScrollEl();
+        if (!activeScrollEl || activeScrollEl.scrollTop > 0) {
+          canPull = false;
+          return;
+        }
         pulling = false;
         triggered = false;
+        canPull = true;
         pullStart = event.touches[0].clientY;
         main.style.transition = "none";
       }, { passive: true });
 
       main.addEventListener("touchmove", (event) => {
-        if (main.scrollTop > 0) return;
+        if (!canPull || !activeScrollEl) return;
+        if (activeScrollEl.scrollTop > 0) {
+          canPull = false;
+          return;
+        }
         const current = event.touches[0].clientY;
         const delta = current - pullStart;
         pullDelta = delta;
         if (delta <= 0) {
           setPullIndicator("idle");
           pulling = false;
+          canPull = false;
+          pullVisibleAt = 0;
           main.style.transform = "";
           return;
         }
-        if (!pulling && delta < 6) return;
+        if (!pulling && delta < 4) return;
         pulling = true;
         event.preventDefault();
         const offset = Math.min(delta, 120);
         main.style.transform = `translateY(${offset}px)`;
-        setPullIndicator("pull", "Pull to refresh");
-        if (!triggered && delta > pullThreshold) {
-          triggered = true;
-          setPullIndicator("refresh", "Refreshing...");
-        }
+        triggered = delta > pullThreshold;
+        if (!pullVisibleAt) pullVisibleAt = Date.now();
+        setPullIndicator("pull", "PULL TO REFRESH");
       }, { passive: false });
 
       main.addEventListener("touchend", () => {
+        if (!canPull) return;
         setPullIndicator("idle");
         main.style.transition = "transform 180ms ease";
         main.style.transform = "";
-        if (triggered) triggerFullRefresh();
+        if (triggered && pullVisibleAt && (Date.now() - pullVisibleAt) >= 200) {
+          triggerFullRefresh();
+        }
         pullStart = 0;
         pullDelta = 0;
         triggered = false;
         pulling = false;
+        canPull = false;
+        activeScrollEl = null;
+        pullVisibleAt = 0;
       });
       chatMessages.addEventListener("scroll", async () => {
         if (!activeChannel || isChatLoading || chatBefore <= 0) return;
